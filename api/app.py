@@ -1,6 +1,7 @@
 import pandas as pd
 import requests
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 
 
 def main():
@@ -30,7 +31,8 @@ def main():
 
 def transform_data(df):
     column_map = {
-        "registeredAuctionParticipant": "participant_name",
+        "_id": "result_id",
+        "registeredAuctionParticipant": "registered_auction_participant",
         "auctionUnit": "auction_unit",
         "serviceType": "service_type",
         "auctionProduct": "product_type",
@@ -40,19 +42,24 @@ def transform_data(df):
         "deliveryEnd": "delivery_end",
         "technologyType": "technology_type",
         "postCode": "post_code",
-        "unitResultID": "unit_result_id"
+        "unitResultID": "unit_result_id",
+        "_full_text": "full_text"
     }
     df.rename(columns=column_map, inplace=True)
     return df
 
 
+
 def insert_data_into_db(df, database_url):
     try:
         engine = create_engine(database_url)
+        print("Columns being inserted:", df.columns)  # Debugging
         df.to_sql('auction_results', con=engine, if_exists='append', index=False)
         print("Rows inserted:", len(df))
+    except SQLAlchemyError as e:
+        print(f"SQLAlchemy error: {e}")
     except Exception as e:
-        print(f"Failed to insert data: {e}")
+        print(f"General error: {e}")
     finally:
         engine.dispose()
 
