@@ -1,11 +1,18 @@
 import pandas as pd
 import requests
 from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
-
+import pytz
+from datetime import datetime
 
 def main():
-    sql_query = '''SELECT * FROM "a63ab354-7e68-44c2-ad96-c6f920c30e85" ORDER BY "_id" ASC LIMIT 100'''
+    # Get the current date in CT timezone
+    ct_timezone = pytz.timezone('America/Chicago')
+    current_date = datetime.now(ct_timezone).date()  # this gets the date part only
+    print("Current date (CT):", current_date)
+
+    # Fetch all records
+    # TODO: adjust query to only get data from current date
+    sql_query = f'''SELECT * FROM "a63ab354-7e68-44c2-ad96-c6f920c30e85" ORDER BY "_id" ASC'''
     params = {'sql': sql_query}
 
     try:
@@ -15,19 +22,25 @@ def main():
         df = pd.DataFrame(data["records"])
         df = transform_data(df)
 
-        print("DataFrame shape:", df.shape)
-        if df.empty:
-            print("No data to insert. DataFrame is empty.")
+        # Debug print before filtering
+        print("Before filtering, DataFrame shape:", df.shape)
+
+        # Filter DataFrame based on the 'delivery_start' matching today's date
+        df['delivery_start'] = pd.to_datetime(df['delivery_start']).dt.date
+        df_filtered = df[df['delivery_start'] == current_date]
+
+        print("After filtering, DataFrame shape:", df_filtered.shape)
+        if df_filtered.empty:
+            print("No data to insert. DataFrame is empty after filtering.")
         else:
             print("Transformed DataFrame ready for insertion:")
             database_url = "postgresql://postgres:postgres@db:5432/postgres"
-            insert_data_into_db(df, database_url)
+            insert_data_into_db(df_filtered, database_url)
             print("Data successfully inserted into database.")
     except requests.exceptions.RequestException as e:
         print(str(e))
     except Exception as e:
         print(f"An error occurred: {e}")
-
 
 def transform_data(df):
     column_map = {
@@ -48,23 +61,16 @@ def transform_data(df):
     df.rename(columns=column_map, inplace=True)
     return df
 
-
-
 def insert_data_into_db(df, database_url):
     try:
         engine = create_engine(database_url)
         print("Columns being inserted:", df.columns)  # Debugging
         df.to_sql('auction_results', con=engine, if_exists='append', index=False)
         print("Rows inserted:", len(df))
-    except SQLAlchemyError as e:
-        print(f"SQLAlchemy error: {e}")
     except Exception as e:
         print(f"General error: {e}")
     finally:
         engine.dispose()
-
-
-
 
 if __name__ == "__main__":
     main()
