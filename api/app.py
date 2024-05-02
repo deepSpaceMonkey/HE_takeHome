@@ -13,12 +13,15 @@ def main():
         data = response.json()["result"]
         df = pd.DataFrame(data["records"])
         df = transform_data(df)
-        print("Transformed DataFrame ready for insertion:")
 
-        # Database connection settings
-        database_url = "postgresql://postgres:postgres@db:5432/postgres"  # Adjust as needed
-        insert_data_into_db(df, database_url)
-        print("Data successfully inserted into database.")
+        print("DataFrame shape:", df.shape)
+        if df.empty:
+            print("No data to insert. DataFrame is empty.")
+        else:
+            print("Transformed DataFrame ready for insertion:")
+            database_url = "postgresql://postgres:postgres@db:5432/postgres"
+            insert_data_into_db(df, database_url)
+            print("Data successfully inserted into database.")
     except requests.exceptions.RequestException as e:
         print(str(e))
     except Exception as e:
@@ -44,9 +47,16 @@ def transform_data(df):
 
 
 def insert_data_into_db(df, database_url):
-    engine = create_engine(database_url)
-    df.to_sql('auction_results', con=engine, if_exists='append', index=False)
-    engine.dispose()  # Close the connection
+    try:
+        engine = create_engine(database_url)
+        df.to_sql('auction_results', con=engine, if_exists='append', index=False)
+        print("Rows inserted:", len(df))
+    except Exception as e:
+        print(f"Failed to insert data: {e}")
+    finally:
+        engine.dispose()
+
+
 
 
 if __name__ == "__main__":
